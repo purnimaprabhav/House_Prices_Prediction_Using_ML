@@ -1,23 +1,29 @@
-<<<<<<< HEAD
-"""Module for model inference functions."""
 import os
-from typing import Tuple
-
-import pandas as pd
-import numpy as np
+import sys
+import warnings
 import joblib
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+import numpy as np
+import pandas as pd
+from typing import Tuple
+from house_prices.preprocess import clean_data, preprocess_features, encode_features, scale_features
 
-from .preprocess import clean_data, encode_features, scale_features
+# Suppress warnings
+warnings.filterwarnings(
+    "ignore",
+    message=(
+        "The number of features does not match the model's expected input!"
+    ),
+)
 
+# Add custom module path
+sys.path.append("/Users/purnimaprabha/dsp-purnima-prabha")
 
+# Model and preprocessing objects
 ModelObjects = Tuple[
     RandomForestRegressor,
     StandardScaler,
     OneHotEncoder,
 ]
-
 
 def load_objects(models_dir: str = None) -> ModelObjects:
     """Load model and preprocessing objects.
@@ -33,23 +39,24 @@ def load_objects(models_dir: str = None) -> ModelObjects:
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         models_dir = os.path.join(project_root, 'models')
 
-    model = joblib.load(os.path.join(models_dir, 'model.joblib'))
-    scaler = joblib.load(os.path.join(models_dir, 'scaler.joblib'))
-    encoder = joblib.load(os.path.join(models_dir, 'encoder.joblib'))
-    return model, scaler, encoder
+    model = joblib.load(os.path.join(models_dir, 'random_forest_model.pkl'))
+    scaler = joblib.load(os.path.join(models_dir, 'standard_scaler.pkl'))
+    encoder = joblib.load(os.path.join(models_dir, 'one_hot_encoder.pkl'))
+    cat_imputer = joblib.load(os.path.join(models_dir, 'cat_imputer.pkl'))
+    
+    return model, scaler, encoder, cat_imputer
 
-
-def make_predictions(input_data: pd.DataFrame) -> np.ndarray:
+def make_predictions(input_data: pd.DataFrame) -> pd.DataFrame:
     """Make predictions on new data.
 
     Args:
         input_data: DataFrame containing features to predict on
 
     Returns:
-        Array of predictions
+        DataFrame with predictions
     """
-    # Load model objects
-    model, scaler, encoder = load_objects()
+    # Load model and preprocessing objects
+    model, scaler, encoder, cat_imputer = load_objects()
 
     # Clean data
     cleaned_data = clean_data(input_data)
@@ -68,69 +75,18 @@ def make_predictions(input_data: pd.DataFrame) -> np.ndarray:
         encoded_data, num_cols, fit=False, scaler=scaler
     )
 
-    # Make predictions
-    return model.predict(processed_data)
-=======
-import sys
-import warnings
-import joblib
-import numpy as np
-import pandas as pd
-from house_prices.preprocess import preprocess_features
-
-# Suppress warnings
-warnings.filterwarnings(
-    "ignore",
-    message=(
-        "The number of features does not match the model's expected input!"
-    ),
-)
-
-# Add custom module path
-sys.path.append("/Users/purnimaprabha/dsp-purnima-prabha")
-
-# Load models and transformers
-model = joblib.load(
-    "/Users/purnimaprabha/dsp-purnima-prabha/models/random_forest_model.pkl"
-)
-encoder = joblib.load("models/one_hot_encoder.pkl")
-scaler = joblib.load("models/standard_scaler.pkl")
-cat_imputer = joblib.load("models/cat_imputer.pkl")
-
-
-def make_predictions(input_data: pd.DataFrame) -> pd.DataFrame:
-    """Predict house prices using the pre-trained model."""
-    cat_features = [
-        "MSZoning", "Street", "LotConfig",
-        "Neighborhood", "Condition1",
-    ]
-    num_features = [
-        "OverallQual", "GrLivArea",
-        "TotRmsAbvGrd", "GarageCars",
-    ]
-
-    # Preprocess input data
-    X_cat, X_num = preprocess_features(
-        input_data, cat_features, num_features,
-        cat_imputer, encoder, scaler
-    )
-    X_transformed = np.hstack([X_cat, X_num])
-
-    # Feature mismatch check
-    expected, actual = 16, X_transformed.shape[1]
+    # Feature mismatch check (optional)
+    expected, actual = 16, processed_data.shape[1]  # Adjust the expected value if needed
     if actual != expected:
         print(f"Warning: Expected {expected} features, got {actual}.")
 
-    # Predict SalePrice
-    y_pred = model.predict(X_transformed)
+    # Make predictions
+    y_pred = model.predict(processed_data)
     input_data["SalePrice"] = np.maximum(0, y_pred)
 
     return input_data[["Id", "SalePrice"]]
 
 
 if __name__ == "__main__":
-    input_data = pd.read_csv(
-        "/Users/purnimaprabha/dsp-purnima-prabha/house_prices/test.csv"
-    )
+    input_data = pd.read_csv("/Users/purnimaprabha/dsp-purnima-prabha/house_prices/test.csv")
     print(make_predictions(input_data))
->>>>>>> pw2
