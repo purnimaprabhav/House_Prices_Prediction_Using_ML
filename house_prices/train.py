@@ -1,17 +1,13 @@
-<<<<<<< HEAD
-"""Module for model training functions."""
-from typing import Dict, Tuple
 import os
-
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error
 import joblib
-
+import numpy as np
+import pandas as pd
+from typing import Dict, Tuple
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from .preprocess import clean_data, encode_features, scale_features
-
 
 def split_data(
     df: pd.DataFrame,
@@ -32,8 +28,29 @@ def split_data(
     """
     X = df.drop(columns=[target_col])
     y = df[target_col]
-
     return train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+
+def preprocess_features(
+    X: pd.DataFrame,
+    cat_features: list[str],
+    num_features: list[str],
+    cat_imputer=None,
+    encoder=None,
+    scaler=None,
+):
+    """
+    Impute, encode, and scale features.
+    """
+    cat_imputer = cat_imputer or SimpleImputer(strategy="most_frequent")
+    encoder = encoder or OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+    scaler = scaler or StandardScaler()
+
+    X_cat_imputed = cat_imputer.fit_transform(X[cat_features])
+    X_cat_encoded = encoder.fit_transform(X_cat_imputed)
+    X_num_scaled = scaler.fit_transform(X[num_features])
+
+    return X_cat_encoded, X_num_scaled, cat_imputer, encoder, scaler
 
 
 def train_model(
@@ -72,8 +89,9 @@ def evaluate_model(
         Dictionary with performance metrics
     """
     predictions = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, predictions))
-    return {'rmse': rmse}
+    mse = mean_squared_error(y_test, predictions)
+    r2 = r2_score(y_test, predictions)
+    return {"Mean Squared Error": mse, "R-squared": r2}
 
 
 def build_model(data: pd.DataFrame) -> Dict[str, float]:
@@ -104,20 +122,12 @@ def build_model(data: pd.DataFrame) -> Dict[str, float]:
     num_cols = X_train_cleaned.select_dtypes(include=['int64', 'float64']).columns.tolist()
 
     # Encode categorical features
-    X_train_enc, encoder = encode_features(
-        X_train_cleaned, cat_cols, fit=True
-    )
-    X_test_enc, _ = encode_features(
-        X_test_cleaned, cat_cols, fit=False, encoder=encoder
-    )
+    X_train_enc, encoder = encode_features(X_train_cleaned, cat_cols, fit=True)
+    X_test_enc, _ = encode_features(X_test_cleaned, cat_cols, fit=False, encoder=encoder)
 
     # Scale numeric features
-    X_train_proc, scaler = scale_features(
-        X_train_enc, num_cols, fit=True
-    )
-    X_test_proc, _ = scale_features(
-        X_test_enc, num_cols, fit=False, scaler=scaler
-    )
+    X_train_proc, scaler = scale_features(X_train_enc, num_cols, fit=True)
+    X_test_proc, _ = scale_features(X_test_enc, num_cols, fit=False, scaler=scaler)
 
     # Train model
     model = train_model(X_train_proc, y_train)
@@ -131,92 +141,3 @@ def build_model(data: pd.DataFrame) -> Dict[str, float]:
     performance = evaluate_model(model, X_test_proc, y_test)
 
     return performance
-=======
-import joblib
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-
-def preprocess_features(
-    X: pd.DataFrame,
-    cat_features: list[str],
-    num_features: list[str],
-    cat_imputer=None,
-    encoder=None,
-    scaler=None,
-):
-    """
-    Impute, encode, and scale features.
-    """
-    cat_imputer = cat_imputer or SimpleImputer(strategy="most_frequent")
-    encoder = encoder or OneHotEncoder(
-        sparse_output=False, handle_unknown="ignore")
-    scaler = scaler or StandardScaler()
-
-    X_cat_imputed = cat_imputer.fit_transform(X[cat_features])
-    X_cat_encoded = encoder.fit_transform(X_cat_imputed)
-    X_num_scaled = scaler.fit_transform(X[num_features])
-
-    return X_cat_encoded, X_num_scaled, cat_imputer, encoder, scaler
-
-
-def build_model(
-        training_data_df: pd.DataFrame,
-        test_data_df: pd.DataFrame) -> dict:
-    """
-    Train a RandomForestRegressor and evaluate.
-    """
-    cat_features = [
-        "MSZoning",
-        "Street",
-        "LotConfig",
-        "Neighborhood",
-        "Condition1"]
-    num_features = ["OverallQual", "GrLivArea", "TotRmsAbvGrd", "GarageCars"]
-
-    X_train, y_train = (
-        training_data_df.drop(columns="SalePrice"),
-        training_data_df["SalePrice"],
-    )
-    X_test, y_test = test_data_df.drop(
-        columns="SalePrice"), test_data_df["SalePrice"]
-
-    X_train_cat_encoded, X_train_num_scaled, cat_imputer, encoder, scaler = (
-        preprocess_features(X_train, cat_features, num_features)
-    )
-    X_test_cat_encoded, X_test_num_scaled, _, _, _ = preprocess_features(
-        X_test, cat_features, num_features, cat_imputer, encoder, scaler
-    )
-
-    # Match columns of test data to train data
-    X_test_cat_encoded = pd.DataFrame(
-        X_test_cat_encoded, columns=encoder.get_feature_names_out(cat_features)
-    )
-    X_test_cat_encoded = X_test_cat_encoded.reindex(
-        columns=X_train_cat_encoded.columns, fill_value=0
-    )
-
-    # Combine features and train model
-    X_train_transformed = np.hstack([X_train_cat_encoded, X_train_num_scaled])
-    X_test_transformed = np.hstack([X_test_cat_encoded, X_test_num_scaled])
-
-    model = RandomForestRegressor().fit(X_train_transformed, y_train)
-
-    # Predict and evaluate
-    y_test_pred = model.predict(X_test_transformed)
-    mse, r2 = mean_squared_error(
-        y_test, y_test_pred), r2_score(
-        y_test, y_test_pred)
-
-    # Save model and transformers
-    joblib.dump(model, "models/random_forest_model.pkl")
-    joblib.dump(cat_imputer, "models/cat_imputer.pkl")
-    joblib.dump(encoder, "models/one_hot_encoder.pkl")
-    joblib.dump(scaler, "models/standard_scaler.pkl")
-
-    return {"Mean Squared Error": mse, "R-squared": r2}
->>>>>>> pw2
