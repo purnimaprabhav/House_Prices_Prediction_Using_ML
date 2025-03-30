@@ -1,11 +1,9 @@
-<<<<<<< HEAD
-"""Module for data preprocessing and feature engineering functions."""
-from typing import Tuple, Optional
-
+import os
 import pandas as pd
 import numpy as np
+from typing import Tuple, Optional
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-
+from sklearn.impute import SimpleImputer
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """Clean the input dataframe by handling missing values.
@@ -121,25 +119,36 @@ def scale_features(
     result_df[numeric_features] = scaled_df
 
     return result_df, scaler
-=======
-import sys
-
-
-sys.path.append("/Users/purnimaprabha/dsp-purnima-prabha")
 
 
 def preprocess_features(
-    input_data, cat_features, num_features, cat_imputer, encoder, scaler
-):
+    input_data: pd.DataFrame, 
+    cat_features: list[str], 
+    num_features: list[str], 
+    cat_imputer=None, 
+    encoder=None, 
+    scaler=None
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Preprocess features (encode and scale).
+
+    Args:
+        input_data: Dataframe containing the features
+        cat_features: List of categorical feature names
+        num_features: List of numeric feature names
+        cat_imputer: Imputer for categorical features
+        encoder: OneHotEncoder for categorical features
+        scaler: StandardScaler for numerical features
+
+    Returns:
+        Tuple of processed categorical and numerical features
+    """
     # Handle categorical features
     X_cat = input_data[cat_features]
     X_cat_imputed = cat_imputer.transform(X_cat)  # Use the imputer
-    X_cat_encoded = encoder.transform(
-        X_cat_imputed)  # Encode using one-hot encoder
+    X_cat_encoded = encoder.transform(X_cat_imputed)  # Encode using one-hot encoder
 
     # Handle numerical features
     X_num = input_data[num_features]
     X_num_scaled = scaler.transform(X_num)  # Scale using the scaler
 
     return X_cat_encoded, X_num_scaled
->>>>>>> pw2
